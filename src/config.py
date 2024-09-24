@@ -16,6 +16,7 @@ class Config:
     MONGO_URI = os.environ.get("MONGO_URI")
     DB_NAME = os.environ.get("DB_NAME")
     JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY")
+    print("🚀 ~ JWT_SECRET_KEY:", JWT_SECRET_KEY)
     JWT_ACCESS_TOKEN_EXPIRES = 86400
     GOOGLE_AUT_CLIENT_ID = os.environ.get("GOOGLE_AUT_CLIENT_ID")
     GOOGLE_AUTH_CLIENT_SECRET = os.environ.get("GOOGLE_AUTH_CLIENT_SECRET")

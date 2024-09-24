@@ -3,7 +3,6 @@ from src.app.auth.schema import ForgotPasswordSchema, LoginSchema, ResetPassword
 from src.app.auth.services import forgot_password, register_user, reset_password, signin_user, user_sso_login, verify_user_email
 
 auth = Blueprint("auth", __name__, url_prefix="/api/auth", description="Auth API")
-print('test')
 
 @auth.route('/signup', methods=['POST'])
 @auth.arguments(SignupSchema)

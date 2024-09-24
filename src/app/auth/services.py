@@ -149,90 +149,79 @@ def send_verification_email(email, user_name, signup_token):
         print(f"Error sending email: {e}")
 
 def signin_user(body):
+    """
+    Service to sign in the user and generate an access token.
+
+    Parameters:
+        body (dict): The request body containing the user's credentials (email and password).
+
+    Returns:
+        (dict): A JSON response with the access token or an error message, along with an HTTP status code.
+    """
     try:
-        # Ensure body is a dictionary
-        if not isinstance(body, dict):
-            return make_response(
-                status="error",
-                message="Invalid request body",
-                status_code=400
-            )
-        
         email = body.get("email")
         password = body.get("password")
-        
+
+        # Check if both email and password are provided
         if not email or not password:
             return make_response(
                 status="error",
                 message="Email and password are required",
                 status_code=400
             )
-        
-        # Check if the user exists in the database
+
+        # Find the user by email
         user = db.users.find_one({"email": email})
-        
+
+        # Log the user object to debug the _id issue
+        print(f"Fetched user: {user}")  # This will show you the user structure
+
+        # If the user is not found, return an error
         if not user:
             return make_response(
                 status="error",
-                message=INVALID_USER,
+                message="Invalid email or password",
                 status_code=400
             )
-        
-        # Check if email is verified
-        if not user.get("is_email_verified"):
-            # Generate a new signup token
-            signup_token = str(uuid.uuid4())
-            # Update the user with the new signup token
-            db.users.update_one(
-                {"_id": user["_id"]},
-                {"$set": {"signup_token": signup_token}}
-            )
-            # Resend the verification email
-            send_verification_email(email, user['name'], signup_token)
+
+        # Ensure the user has an "_id" field and log the _id
+        if not user.get("_id"):
+            print("User object does not contain _id.")
             return make_response(
                 status="error",
-                message=EMAIL_NOT_VERIFIED_MESSAGE,
-                status_code=400
+                message="User record is incomplete. Missing user ID.",
+                status_code=500
             )
-        
-        # Retrieve and check the stored password
+
+        # Log the fetched _id
+        print(f"User ID: {user['_id']}")
+
+        # Retrieve the user's password and compare
         stored_password = user.get("password")
         if not stored_password or not bcrypt.checkpw(password.encode('utf-8'), stored_password.encode('utf-8')):
             return make_response(
                 status="error",
-                message=INVALID_CREDENTIALS_MESSAGE,
+                message="Invalid email or password",
                 status_code=400
             )
 
-        # Generate access token with a 24-hour expiration time
-        access_token = create_access_token(identity={"email": user.get("email"), "user_id": str(user["_id"])}, expires_delta=datetime.timedelta(hours=TOKEN_EXPIRE_TIME))
-        
-        # Update the user's oauth_access_token field
-        db.users.update_one(
-            {"_id": user["_id"]},
-            {"$set": {"oauth_access_token": access_token}}
-        )
-        
-        # Return success response with the access token and user details
+        # Generate access token with user's email and ID
+        access_token = create_access_token(identity=user)
+
+        # Return the access token with success message
         return make_response(
             status="success",
-            message="User signed in successfully",
-            data={
-                "access_token": access_token,
-                "user": {
-                    "email": user.get("email"),
-                    "name": user.get("name"),
-                    "id": str(user["_id"])
-                }
-            },
+            message="Login successful",
+            data={"access_token": access_token},
             status_code=200
         )
-    
+
     except Exception as e:
+        # Log the error and return an internal server error response
         print(f"Error in signin: {e}")
         return make_response(
             status="error",
-            message=INTERNAL_SERVER_ERROR_MESSAGE,
+            message="Internal server error occurred during sign-in",
             status_code=500
         )
 

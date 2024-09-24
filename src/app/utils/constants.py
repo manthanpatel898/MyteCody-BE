@@ -17,3 +17,5 @@ DEFAULT_SETTINGS = {
 
 
 TOKEN_EXPIRE_TIME=99999
+
+PROPOSAL_STATUS = {"in_progress": "in-progress", "completed": "completed"}
