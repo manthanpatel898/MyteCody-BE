@@ -10,6 +10,9 @@ from src.db import db
 from src.config import Config
 from src.app.auth.routes import auth
 from src.app.proposal.routes import proposals
+from src.app.user.routes import users
+from src.app.individualProfile.routes import individual_profile_bp
+from src.app.wallet.routes import wallet_bp
 from marshmallow import ValidationError
 
 load_dotenv()
@@ -26,7 +29,9 @@ def create_app():
 
     api.register_blueprint(auth)
     api.register_blueprint(proposals)
-
+    api.register_blueprint(users)
+    api.register_blueprint(individual_profile_bp)
+    api.register_blueprint(wallet_bp)
     # Register error handlers
     app.register_error_handler(ValidationError, handle_marshmallow_validation)
     app.register_error_handler(Exception, handle_exception)

@@ -1,7 +1,8 @@
+from urllib import request
 from flask_smorest import Blueprint
 from src.app.auth.schema import StandardResponseSchema
 from src.app.proposal.schema import AddEpicSchema, AddStorySchema, AddTaskSchema, ChatPayload, DeleteEpicSchema, DeleteStorySchema, DeleteTaskSchema, SaveStep1Prompt, UpdateBusinessVerticalSchema, UpdateEpicSchema, UpdateStakeHoldersSchema, UpdateStorySchema, UpdateTaskSchema
-from src.app.proposal.services import add_new_epic, add_new_story, add_new_task, chat_conversation, delete_epic_by_id, delete_existing_story, delete_existing_task, delete_proposal, fetch_epics, fetch_stories_by_epic_and_stakeholder, fetch_tasks_by_story, generate_epics, generate_proposal_details, generate_story_basedon_epics, generate_tasks_basedon_stories, generateDetailReport, get_business_vertical, get_conversation, get_project_vision, get_revenue_model, get_stakeholders, save_conversation, save_project_vision, update_business_vertical, update_existing_epic, update_existing_story, update_existing_task, update_stakeholders
+from src.app.proposal.services import add_new_epic, add_new_story, add_new_task, chat_conversation, delete_epic_by_id, delete_existing_story, delete_existing_task, delete_proposal, fetch_epics, fetch_proposals, fetch_stories_by_epic_and_stakeholder, fetch_tasks_by_story, generate_epics, generate_proposal_details, generate_story_basedon_epics, generate_tasks_basedon_stories, generateDetailReport, get_business_vertical, get_conversation, get_project_vision, get_revenue_model, get_stakeholders, proposal_basic_info, save_conversation, save_project_vision, update_business_vertical, update_existing_epic, update_existing_story, update_existing_task, update_stakeholders
 from flask_jwt_extended import jwt_required, current_user
 
 proposals = Blueprint("proposal", __name__, url_prefix="/api/proposal", description="Proposal API")
@@ -455,3 +456,36 @@ def generate_proposal_report(proposal_id):
     # Generate detailed report for the proposal
     return generateDetailReport(proposal_id, user["_id"])
     
+@proposals.route("/get/proposals/page/<int:page>", methods=["GET"])
+@proposals.route("/get/proposals/page/<int:page>/status/<string:status>", methods=["GET"])
+@jwt_required()
+def get_proposals(page, status=None):
+    """
+    API endpoint to fetch paginated proposals with optional status filtering and tokens used.
+
+    Parameters:
+        page (int): The page number for pagination.
+        status (str): The optional status filter for proposals (e.g., 'in-progress', 'completed').
+
+    Returns:
+        (dict): A JSON response with paginated proposal data and tokens used or an error message.
+    """
+    user = current_user
+    # Fetch proposals based on user ID, page, and optional status filter
+    return fetch_proposals(user["_id"], page, status)
+
+@proposals.get("/generate/proposal/<string:proposal_id>")
+@jwt_required()
+def generate_proposal_report(proposal_id):
+    """
+    API endpoint to generate detailed proposal report.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal to generate the report for.
+
+    Returns:
+        (dict): A JSON response with the generated proposal details or an error message.
+    """
+    user = current_user
+    # Generate the basic proposal details
+    return proposal_basic_info(proposal_id=proposal_id, user_id=user["_id"])

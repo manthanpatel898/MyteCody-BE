@@ -81,3 +81,25 @@ STAKEHOLDER_OR_EPIC_NOT_FOUND = "Stakeholder or Epic not found."
 STAKEHOLDER_EPIC_OR_STORY_NOT_FOUND = "Stakeholder or Epic or story not found."
 STORY_NOT_FOUND = "Story not found"
 TASK_NOT_FOUND = "Task not found"
+
+PROFILE_ALREADY_EXISTS = "Profile already exists."
+PROFILE_CREATED_SUCCESS = "User profile created successfully."
+DUPLICATE_KEY_ERROR = "Duplicate key error, user profile may already exist."
+PROFILE_NOT_FOUND = "User profile not found."
+PROFILE_FETCHED_SUCCESS = "User profile fetched successfully."
+PROFILE_UPDATED_SUCCESS = "User profile updated successfully."
+NO_PROFILE_CHANGES = "No changes were made to the profile."
+PROFILE_DELETED_SUCCESS = "User profile deleted successfully."
+DB_ERROR = "Database error occurred."
+UNEXPECTED_ERROR = "An unexpected error occurred."
+
+ # Wallet-related messages
+WALLET_INFO_FETCHED_SUCCESS = "Wallet information fetched successfully."
+WALLET_NOT_FOUND = "Wallet not found."
+
+# Payment-related messages
+PAYMENT_INTENT_CREATED = "Payment intent created successfully."
+PAYMENT_METHODS_FETCHED_SUCCESS = "Payment methods fetched successfully."
+PAYMENT_METHOD_ATTACHED_SUCCESS = "Payment method attached successfully."
+MISSING_PARAMETERS = "Missing required parameters."
+

@@ -84,7 +84,7 @@ def register_user(data):
             status="success",
             message=USER_REGISTERED_SUCCESSFULLY_MESSAGE,
             data={"user_id": str(user_id)},
-            status_code=201
+            status_code=200
         )
     
     except ValidationError as err:

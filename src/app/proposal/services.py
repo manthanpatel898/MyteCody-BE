@@ -3671,3 +3671,196 @@ def generateDetailReport(proposal_id, user_id):
     except Exception as e:
         print("Error in generating report", e)
         raise e
+def fetch_proposals(user_id, page=1, status=None):
+    """
+    Service to fetch paginated proposals for a specific user with optional status filtering.
+
+    Parameters:
+        user_id (str): The ID of the user making the request.
+        page (int): The page number for pagination (default is 1).
+        status (str): The optional status filter for proposals ('in-progress', 'completed').
+
+    Returns:
+        dict: A JSON response with paginated proposal data, tokens used, or an error message.
+    """
+    try:
+        # Set up pagination variables
+        per_page = 10
+        skip = (page - 1) * per_page
+
+        # Create a filter based on the status if provided
+        query_filter = {"user": ObjectId(user_id)}
+        if status and status != "all":  # Allow 'all' to bypass status filtering
+            query_filter["status"] = status
+
+        # Define the projection to limit fields returned
+        projection_fields = {
+            "_id": 1,
+            "business_vertical": 1,
+            "last_step": 1,
+            "status": 1,
+            "user": 1,
+            "step": 1,
+            "sr_no": 1,
+            "title": 1,
+            "description": 1
+        }
+
+        # Fetch proposals from the database with pagination and projection
+        proposals = list(db.proposals.find(query_filter, projection_fields).skip(skip).limit(per_page))
+
+        if not proposals:
+            return make_response(
+                status="error",
+                message="No proposals found",
+                data=None,
+                status_code=404
+            )
+
+        # Convert ObjectId to string in each proposal
+        for proposal in proposals:
+            proposal["_id"] = str(proposal["_id"])
+            proposal["user"] = str(proposal["user"])
+
+            # Add tokens_used from the proposal_usage collection
+            usage = db.proposal_usage.find_one(
+                {"proposal_id": ObjectId(proposal["_id"]), "user_id": ObjectId(user_id)},
+                {"tokens_used": 1, "_id": 0}
+            )
+            proposal["tokens_used"] = usage.get("tokens_used", 0) if usage else 0
+
+        # Return the proposals in the response with pagination metadata
+        total_proposals = db.proposals.count_documents(query_filter)
+        response_data = {
+            "proposals": proposals,
+            "total": total_proposals,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": (total_proposals + per_page - 1) // per_page
+        }
+
+        return make_response(
+            status="success",
+            message="Proposals fetched successfully",
+            data=response_data,
+            status_code=200
+        )
+
+    except Exception as e:
+        print(f"Error in fetching proposals: {e}")
+        return make_response(
+            status="error",
+            message="Internal Server Error",
+            data=None,
+            status_code=500
+        )
+
+def proposal_basic_info(proposal_id, user_id):
+    """
+    Service function to generate basic proposal details for the given proposal_id and user_id.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal.
+        user_id (str): The ID of the user making the request.
+
+    Returns:
+        (dict): A JSON response with proposal details, budget information, and token usage, or an error message.
+    """
+    try:
+        # Fetch the proposal based on proposal_id and user_id
+        data = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
+        
+        if not data:
+            return make_response(
+                status="error",
+                message="Proposal not found for the given proposal_id and user_id",
+                data=None,
+                status_code=404
+            )
+
+        # Ensure the required keys exist in the data
+        if "epics" not in data or "project_requirement" not in data:
+            return make_response(
+                status="error",
+                message="Missing required fields 'epics' or 'project_requirement' in the proposal data",
+                data=None,
+                status_code=400
+            )
+        
+        # Extract the project breakdown and requirement
+        project_breakdown = data["epics"]
+        project_requirement = data["project_requirement"]
+
+        # Call helper function to create detailed proposal information
+        project_details = Proposal_Creation(project_breakdown, project_requirement, user_id, proposal_id)
+
+        # Calculate budget (costs and hours) and add it to the proposal details
+        budget = calculate_total_costs_and_hours(project_breakdown)
+        project_details["Budget"] = budget
+        
+        # Fetch the tokens used from the proposal_usage collection
+        tokens_used_data = db.proposal_usage.find_one(
+            {"proposal_id": ObjectId(proposal_id), "user_id": ObjectId(user_id)}
+        )
+        project_details["token_used"] = tokens_used_data.get("tokens_used", 0) if tokens_used_data else 0
+
+        # Return success response with proposal details
+        return make_response(
+            status="success",
+            message="Proposal report generated successfully",
+            data=project_details,
+            status_code=200
+        )
+    
+    except ValueError as ve:
+        # Handle known errors (like missing data)
+        print(f"ValueError: {ve}")
+        return make_response(
+            status="error",
+            message=str(ve),
+            data=None,
+            status_code=400
+        )
+    
+    except Exception as e:
+        # Handle unexpected errors
+        print(f"Error in generating proposal details: {e}")
+        return make_response(
+            status="error",
+            message="Internal Server Error",
+            data=None,
+            status_code=500
+        )
+
+def calculate_total_costs_and_hours(project_breakdown):
+    """
+    Calculate the total estimated hours and total estimated cost for the given project breakdown.
+
+    Parameters:
+        project_breakdown (list): A list of epics, each containing user stories with tasks.
+
+    Returns:
+        dict: A dictionary containing the total estimated hours and total estimated cost.
+    """
+    total_hours = 0
+    total_cost = 0
+
+    # Iterate over each epic in the project breakdown
+    for epics in project_breakdown:
+        # Iterate over each epic's stories
+        for epic_data in epics["data"]:
+            # Process each story in the epic
+            for story in epic_data["user_stories"]:
+                # Calculate total hours and cost for the story's tasks
+                story_hours = sum(float(task["estimated_hours"]) for task in story["tasks"])
+                story_cost = sum(float(task["cost"]) for task in story["tasks"])
+                
+                # Accumulate the total hours and cost
+                total_hours += story_hours
+                total_cost += story_cost
+
+    # Return the total estimated hours and cost
+    return {
+        "TotalEstimatedHours": total_hours,
+        "TotalEstimatedCost": total_cost,
+    }
