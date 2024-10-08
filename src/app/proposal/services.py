@@ -732,6 +732,61 @@ def save_project_vision(payload: SaveStep1Prompt, user_id):
             data=None,
             status_code=500
         )
+    
+def regenerate_business_vertical_service(user_id, proposal_id):
+    """
+    Service to regenerate the business vertical for a specific proposal.
+
+    Parameters:
+        user_id (str): The ID of the user requesting the regeneration.
+        proposal_id (str): The ID of the proposal for which to regenerate the business vertical.
+
+    Returns:
+        (dict): A JSON response indicating the success or failure of the operation.
+    """
+    try:
+        # Ensure the user exists
+        user = db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return make_response(
+                status="error",
+                message=USER_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
+
+        # Ensure the proposal exists
+        proposal = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
+        if not proposal:
+            return make_response(
+                status="error",
+                message="Proposal not found.",
+                data=None,
+                status_code=404
+            )
+
+        # Regenerate the business vertical
+        business_vertical_response = generate_business_vertical(user_id=user_id, proposal_id=proposal_id)
+
+        if business_vertical_response[1] != 200:
+            return business_vertical_response  # If business vertical generation failed, return the error
+
+        return make_response(
+            status="success",
+            message=BUSINESS_VERTICAL_GENERATION_SUCCESS,
+            data=business_vertical_response[0].json["data"],
+            status_code=200
+        )
+
+    except Exception as e:
+        # Handle any exceptions
+        print(f"Error in regenerating business vertical: {e}")
+        return make_response(
+            status="error",
+            message=INTERNAL_SERVER_ERROR,
+            data=None,
+            status_code=500
+        )
 
 
 def generate_business_vertical(user_id, proposal_id):
@@ -927,6 +982,61 @@ def update_business_vertical(payload, user_id):
     except Exception as e:
         # Log and return an internal server error in case of exceptions
         print(f"Error in updating business vertical: {e}")
+        return make_response(
+            status="error",
+            message=INTERNAL_SERVER_ERROR,
+            data=None,
+            status_code=500
+        )
+    
+def regenerate_stakeholders_service(user_id, proposal_id):
+    """
+    Service to regenerate the stakeholders for a specific proposal.
+
+    Parameters:
+        user_id (str): The ID of the user requesting the regeneration.
+        proposal_id (str): The ID of the proposal for which to regenerate the stakeholders.
+
+    Returns:
+        (dict): A JSON response indicating the success or failure of the operation.
+    """
+    try:
+        # Ensure the user exists
+        user = db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return make_response(
+                status="error",
+                message=USER_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
+
+        # Ensure the proposal exists
+        proposal = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
+        if not proposal:
+            return make_response(
+                status="error",
+                message=PROPOSAL_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
+
+        # Regenerate the stakeholders
+        stakeholder_response = generate_stakeholders(proposal_id=proposal_id, user_id=user_id)
+
+        if stakeholder_response[1] != 200:
+            return stakeholder_response  # If the stakeholder generation failed, return the error
+
+        return make_response(
+            status="success",
+            message=STAKEHOLDER_GENERATION_SUCCESS,
+            data=stakeholder_response[0].json["data"],
+            status_code=200
+        )
+
+    except Exception as e:
+        # Log and return an internal server error in case of exceptions
+        print(f"Error in regenerating stakeholders: {e}")
         return make_response(
             status="error",
             message=INTERNAL_SERVER_ERROR,
@@ -3056,7 +3166,8 @@ def fetch_epics(proposal_id, stakeholder, user_id):
                         "epic_id": epic.get("epic_id"),
                         "title": epic.get("title"),
                         "description": epic.get("description"),
-                        "id": epic.get("id")
+                        "id": epic.get("id"),
+                        "user_stories": epic.get("user_stories")
                     }
                     filtered_epics.append(filtered_epic)
 
@@ -3084,6 +3195,55 @@ def fetch_epics(proposal_id, stakeholder, user_id):
             data=None,
             status_code=500
         )
+    
+def fetch_epics_by_proposal(proposal_id, user_id):
+    """
+    Service to fetch all epics for a given proposal based on the proposal ID and user ID.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal.
+        user_id (ObjectId): The ID of the user.
+
+    Returns:
+        (dict): A JSON response with epics, stakeholder, status, step, and a flag epicsIsPresent.
+    """
+    try:
+        # Fetch the proposal from the database by proposal_id and user_id
+        data = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
+
+        # Check if the proposal exists
+        if not data:
+            return make_response(
+                status="error",
+                message=PROPOSAL_NOT_FOUND,
+                status_code=404
+            )
+
+        # Get epics from the data and check if it's present
+        epics = data.get("epics", [])
+
+        # Prepare the response data
+        response_data = {
+            "epicsIsPresent": len(epics) > 0,  # True if epics list has elements
+            "status": data.get("status", ""),
+            "step": data.get("step", ""),
+        }
+
+        return make_response(
+            status="success",
+            message=EPICS_FETCHED_SUCCESS,
+            data=response_data,
+            status_code=200
+        )
+
+    except Exception as e:
+        print(f"Error fetching epics: {e}")
+        return make_response(
+            status="error",
+            message=INTERNAL_SERVER_ERROR,
+            status_code=500
+        )
+
 
 def delete_proposal(proposal_id, user_id):
     """

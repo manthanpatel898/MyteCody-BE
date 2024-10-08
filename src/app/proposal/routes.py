@@ -2,7 +2,7 @@ from urllib import request
 from flask_smorest import Blueprint
 from src.app.auth.schema import StandardResponseSchema
 from src.app.proposal.schema import AddEpicSchema, AddStorySchema, AddTaskSchema, ChatPayload, DeleteEpicSchema, DeleteStorySchema, DeleteTaskSchema, SaveStep1Prompt, UpdateBusinessVerticalSchema, UpdateEpicSchema, UpdateStakeHoldersSchema, UpdateStorySchema, UpdateTaskSchema
-from src.app.proposal.services import add_new_epic, add_new_story, add_new_task, chat_conversation, delete_epic_by_id, delete_existing_story, delete_existing_task, delete_proposal, fetch_epics, fetch_proposals, fetch_stories_by_epic_and_stakeholder, fetch_tasks_by_story, generate_epics, generate_proposal_details, generate_story_basedon_epics, generate_tasks_basedon_stories, generateDetailReport, get_business_vertical, get_conversation, get_project_vision, get_revenue_model, get_stakeholders, proposal_basic_info, save_conversation, save_project_vision, update_business_vertical, update_existing_epic, update_existing_story, update_existing_task, update_stakeholders
+from src.app.proposal.services import add_new_epic, add_new_story, add_new_task, chat_conversation, delete_epic_by_id, delete_existing_story, delete_existing_task, delete_proposal, fetch_epics, fetch_epics_by_proposal, fetch_proposals, fetch_stories_by_epic_and_stakeholder, fetch_tasks_by_story, generate_epics, generate_project_vision, generate_proposal_details, generate_story_basedon_epics, generate_tasks_basedon_stories, generateDetailReport, get_business_vertical, get_conversation, get_project_vision, get_revenue_model, get_stakeholders, proposal_basic_info, regenerate_business_vertical_service, save_conversation, save_project_vision, update_business_vertical, update_existing_epic, update_existing_story, update_existing_task, update_stakeholders
 from flask_jwt_extended import jwt_required, current_user
 
 proposals = Blueprint("proposal", __name__, url_prefix="/api/proposal", description="Proposal API")
@@ -30,7 +30,7 @@ def get_project_conversation(proposal_id):
     user = current_user  # Assumes current_user is retrieved from JWT
     return get_conversation(user_id=user["_id"], proposal_id=proposal_id)
 
-@proposals.route("/generate/conversation/save/<string:proposal_id>", methods=["POST"])
+@proposals.route("/conversation/save/<string:proposal_id>", methods=["POST"])
 @proposals.response(201, StandardResponseSchema)
 @jwt_required()
 def save_chat_conversation(proposal_id):
@@ -41,6 +41,17 @@ def save_chat_conversation(proposal_id):
     """
     user = current_user  # Get the current authenticated user from JWT
     return save_conversation(user_id=user["_id"], proposal_id=proposal_id)
+
+@proposals.route("/generate/vision/<string:proposal_id>", methods=["POST"])
+@jwt_required()
+def generate_vision(proposal_id):
+    """
+    API Endpoint to generate project vision for a specific proposal.
+
+    This route generates the project vision based on the conversation saved in the proposal.
+    """
+    user = current_user  # Get the current authenticated user from JWT
+    return generate_project_vision(user["_id"], proposal_id)
 
 @proposals.route("/get/projectVision/<string:proposal_id>", methods=["GET"])
 # @proposals.response(201, StandardResponseSchema)
@@ -75,6 +86,22 @@ def save_step1_prompt(body):
     user = current_user  # Get the current authenticated user from JWT
     return save_project_vision(payload=body, user_id=user["_id"])
 
+@proposals.route("/regenerate/business-vertical/<string:proposal_id>", methods=["POST"])
+@jwt_required()
+def regenerate_business_vertical(proposal_id):
+    """
+    API Endpoint to regenerate the business vertical for a specific proposal.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal for which to regenerate the business vertical.
+
+    Returns:
+        (dict): A JSON response indicating the success or failure of the business vertical regeneration.
+    """
+    user = current_user  # Get the current authenticated user from JWT
+    return regenerate_business_vertical_service(user_id=user["_id"], proposal_id=proposal_id)
+
+
 @proposals.route("/get/businessVertical/<string:proposal_id>", methods=["GET"])
 @jwt_required()
 def get_user_business_vertical(proposal_id):
@@ -106,6 +133,21 @@ def update_existing_business_vertical(body):
     """
     user = current_user  # Get the current authenticated user from JWT
     return update_business_vertical(payload=body, user_id=user["_id"])
+
+@proposals.route("/regenerate/stakeholders/<string:proposal_id>", methods=["POST"])
+@jwt_required()
+def regenerate_stakeholders(proposal_id):
+    """
+    API Endpoint to regenerate the stakeholders for a specific proposal.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal for which to regenerate the stakeholders.
+
+    Returns:
+        (dict): A JSON response indicating the success or failure of the stakeholder regeneration.
+    """
+    user = current_user  # Get the current authenticated user from JWT
+    return regenerate_stakeholders_service(user_id=user["_id"], proposal_id=proposal_id)
 
 
 @proposals.route("/get/stakeholders/<string:proposal_id>", methods=["GET"])
@@ -424,6 +466,22 @@ def get_epics_by_stakeholder(proposal_id, stakeholder):
     """
     user = current_user
     return fetch_epics(proposal_id, stakeholder, user["_id"])
+
+@proposals.route("/epics/<string:proposal_id>", methods=["GET"])
+@jwt_required()
+def get_epics_by_proposal(proposal_id):
+    """
+    API Endpoint to fetch all epics for a specific proposal based on the proposal ID and user ID.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal for which epics are being fetched.
+
+    Returns:
+        (dict): A JSON response with the epics, stakeholder, status, and step data.
+    """
+    user = current_user  # Get the current authenticated user from JWT
+    # Call the service function to fetch epics
+    return fetch_epics_by_proposal(proposal_id=proposal_id, user_id=user["_id"])
 
 @proposals.route("/delete/proposal/<string:proposal_id>", methods=["DELETE"])
 @jwt_required()

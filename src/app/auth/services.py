@@ -1,3 +1,4 @@
+from base64 import b64decode
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from multiprocessing import current_process
@@ -18,6 +19,9 @@ stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 from marshmallow import ValidationError
 from flask_jwt_extended import create_access_token
 from bson import ObjectId
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
+import bcrypt
 
 
 def register_user(data):
@@ -29,8 +33,12 @@ def register_user(data):
         
         # Validate the password
         if not validate_password(password):
-            raise ValidationError({"password": PASSWORD_REQUIREMENTS_MESSAGE})
-        
+            return make_response(
+                status="error",
+                message=PASSWORD_REQUIREMENTS_MESSAGE,
+                status_code=400
+            )
+
         # Check if user already exists
         existing_user = db.users.find_one({"email": email})
         if existing_user:
@@ -161,6 +169,11 @@ def signin_user(body):
     try:
         email = body.get("email")
         password = body.get("password")
+
+        # Decrypt the password before validation
+        # secret_key = "mytecodyahmedmanthan8938142india"  # Replace with your actual secret key
+        # password = decrypt_password(encrypted_password, secret_key)
+
 
         # Check if both email and password are provided
         if not email or not password:
@@ -526,3 +539,25 @@ def user_sso_login(args):
             message=INTERNAL_SERVER_ERROR_MESSAGE,
             status_code=500
         )
+
+# Function to decrypt the encrypted password sent from the client
+def decrypt_password(encrypted_password, secret_key):
+    try:
+        # Ensure the secret key is 32 bytes for AES-256
+        key_bytes = secret_key.encode('utf-8').ljust(32)[:32]  # Padding/truncating the key to 32 bytes
+
+        # Decode the encrypted password from Base64 format
+        encrypted_password_bytes = b64decode(encrypted_password)
+
+        # Create an AES cipher object with ECB mode
+        cipher = AES.new(key_bytes, AES.MODE_ECB)
+
+        # Decrypt and unpad the message (CryptoJS uses PKCS7 padding by default)
+        decrypted_bytes = unpad(cipher.decrypt(encrypted_password_bytes), AES.block_size)
+
+        # Return the decrypted password as a string
+        return decrypted_bytes.decode('utf-8')
+
+    except Exception as e:
+        print(f"Decryption error: {e}")
+        return None

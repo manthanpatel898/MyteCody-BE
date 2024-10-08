@@ -21,7 +21,13 @@ def create_app():
     """Create the Flask application instance"""
     app = Flask(__name__)
     jwt = JWTManager(app)
-    CORS(app)
+
+    # Explicitly configure CORS for your React app (localhost or production)
+    CORS(app, resources={r"/*": {"origins": "*"}},
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
+
+
 
     app.config.from_object(Config)
 
@@ -32,6 +38,7 @@ def create_app():
     api.register_blueprint(users)
     api.register_blueprint(individual_profile_bp)
     api.register_blueprint(wallet_bp)
+    
     # Register error handlers
     app.register_error_handler(ValidationError, handle_marshmallow_validation)
     app.register_error_handler(Exception, handle_exception)
