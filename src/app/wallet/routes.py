@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, current_user
 from flask_smorest import Blueprint
 from src.app.wallet.services import attach_payment_method_service, fetch_payment_methods_service, get_wallet_info_service, recharge_wallet_service
 
-wallet_bp = Blueprint("wallet", __name__, url_prefix="/wallet", description="Wallet API")
+wallet_bp = Blueprint("wallet", __name__, url_prefix="/api/wallet", description="Wallet API")
 
 @wallet_bp.route("/info", methods=["GET"])
 @jwt_required()

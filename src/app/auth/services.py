@@ -222,10 +222,22 @@ def signin_user(body):
         access_token = create_access_token(identity=user)
 
         # Return the access token with success message
+        user_info = {
+            "user_id": str(user["_id"]),  # Convert ObjectId to string for JSON compatibility
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "company_name": user.get("company_name"),
+            "user_type": user.get("userType")
+        }
+
+        # Return the access token and user info with success message
         return make_response(
             status="success",
             message="Login successful",
-            data={"access_token": access_token},
+            data={
+                "access_token": access_token,
+                "user": user_info
+            },
             status_code=200
         )
 

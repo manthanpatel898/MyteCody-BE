@@ -330,15 +330,19 @@ def get_conversation(user_id, proposal_id):
 
 def save_conversation(user_id, proposal_id):
     """
-    Service to save the user conversation for a specific proposal and generate project vision.
+    Service to save the user conversation for a specific proposal and optionally generate project vision.
 
     This function fetches the conversation and initiates a background save process to update the project requirements.
-    After successfully saving the conversation, it generates the project vision.
+    If project vision does not exist, it generates the vision after saving the conversation.
+
+    Parameters:
+        user_id (str): The ID of the user.
+        proposal_id (str): The ID of the proposal.
+
+    Returns:
+        (dict): A JSON response indicating the success or failure of the operation.
     """
     try:
-        # Fetch the project description template from the database
-        project_description_template = db.project_description_template.find_one({})["data"]
-
         # Fetch the existing conversation for the given user and proposal
         conversations = db.conversation.find_one({
             "user_id": ObjectId(user_id), 
@@ -353,10 +357,22 @@ def save_conversation(user_id, proposal_id):
                 status_code=404
             )
 
-        # Initiate background save process
+        # Check if the proposal exists
+        proposal = db.proposals.find_one({"user": ObjectId(user_id), "_id": ObjectId(proposal_id)})
+        if not proposal:
+            return make_response(
+                status="error",
+                message="Proposal not found.",
+                data=None,
+                status_code=404
+            )
+
+        # Initiate background save process for the conversation
+        project_description_template = db.project_description_template.find_one({})["data"]
         conversation_background_save(user_id, proposal_id, project_description_template, conversations)
-        updated_at = datetime.datetime.utcnow()
+
         # Update the proposal status in the database
+        updated_at = datetime.datetime.utcnow()
         db.proposals.find_one_and_update(
             {"user": ObjectId(user_id), "_id": ObjectId(proposal_id)},
             {
@@ -368,7 +384,16 @@ def save_conversation(user_id, proposal_id):
             },
         )
 
-        # Generate the project vision after the conversation is saved
+        # Check if project vision is already available in the proposal
+        if "project_vision" in proposal and proposal["project_vision"]:
+            return make_response(
+                status="success",
+                message="Conversation saved successfully. Project vision already exists.",
+                data={"project_vision": proposal["project_vision"]},
+                status_code=200
+            )
+
+        # Generate the project vision only if it doesn't exist
         vision_response = generate_project_vision(user_id, proposal_id)
         if vision_response[1] != 200:
             return vision_response  # If vision generation failed, return the error
@@ -382,14 +407,13 @@ def save_conversation(user_id, proposal_id):
         )
 
     except Exception as e:
-        # Log and return an error response in case of exceptions
         print(f"Error in saving conversation: {e}")
         return make_response(
             status="error",
             message=INTERNAL_SERVER_ERROR,
+            data=None,
             status_code=500
         )
-
 
 
 def conversation_background_save(user_id, proposal_id, project_description_template, initial_description):
@@ -705,7 +729,20 @@ def save_project_vision(payload: SaveStep1Prompt, user_id):
                 }
             )
 
-        # After saving the project vision, generate the business vertical
+        # Check if the business vertical is already present
+        if "business_vertical" in proposal_ref and proposal_ref["business_vertical"]:
+            # If present, return the success response without re-generating
+            return make_response(
+                status="success",
+                message=f"{SAVE_PROJECT_VISION_SUCCESS}. Business vertical already exists.",
+                data={
+                    "project_vision": project_vision,
+                    "business_vertical": proposal_ref["business_vertical"]
+                },
+                status_code=200
+            )
+
+        # If business vertical is not present, generate it
         business_vertical_response = generate_business_vertical(user_id=user_id, proposal_id=payload["proposal_id"])
 
         # Check if the business vertical generation failed
@@ -732,7 +769,7 @@ def save_project_vision(payload: SaveStep1Prompt, user_id):
             data=None,
             status_code=500
         )
-    
+
 def regenerate_business_vertical_service(user_id, proposal_id):
     """
     Service to regenerate the business vertical for a specific proposal.
@@ -922,7 +959,7 @@ def update_business_vertical(payload, user_id):
     """
     Service to update the business vertical for step 2 in the proposal.
 
-    After successfully updating the business vertical, it triggers the stakeholder generation for step 3.
+    After successfully updating the business vertical, it optionally triggers the stakeholder generation for step 3.
 
     Parameters:
         payload (dict): The JSON payload containing the proposal ID and the new business vertical data.
@@ -960,6 +997,19 @@ def update_business_vertical(payload, user_id):
                 }
             }
         )
+
+        # Check if the stakeholders are already present
+        if "stake_holders" in proposal and proposal["stake_holders"]:
+            # If stakeholders are already present, skip generation and return success message
+            return make_response(
+                status="success",
+                message=f"{BUSINESS_VERTICAL_UPDATE_SUCCESS}. Stakeholders already exist.",
+                data={
+                    "business_vertical": payload["business_vertical"],
+                    "stake_holders": proposal["stake_holders"]
+                },
+                status_code=200
+            )
 
         # Call the stakeholder generation process after successfully updating the business vertical
         stakeholder_response = generate_stakeholders(proposal_id=payload["proposal_id"], user_id=user_id)
@@ -1043,6 +1093,7 @@ def regenerate_stakeholders_service(user_id, proposal_id):
             data=None,
             status_code=500
         )
+
 
 def generate_stakeholders(proposal_id, user_id):
     """
@@ -1377,6 +1428,54 @@ def get_revenue_model(proposal_id, user_id):
             status="error",
             message=INTERNAL_SERVER_ERROR,
             data=None,
+            status_code=500
+        )
+    
+def fetch_epics_by_proposal(proposal_id, user_id):
+    """
+    Service to fetch all epics for a given proposal based on the proposal ID and user ID.
+
+    Parameters:
+        proposal_id (str): The ID of the proposal.
+        user_id (ObjectId): The ID of the user.
+
+    Returns:
+        (dict): A JSON response with epics, stakeholder, status, step, and a flag epicsIsPresent.
+    """
+    try:
+        # Fetch the proposal from the database by proposal_id and user_id
+        data = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
+
+        # Check if the proposal exists
+        if not data:
+            return make_response(
+                status="error",
+                message=PROPOSAL_NOT_FOUND,
+                status_code=404
+            )
+
+        # Get epics from the data and check if it's present
+        epics = data.get("epics", [])
+
+        # Prepare the response data
+        response_data = {
+            "epicsIsPresent": len(epics) > 0,  # True if epics list has elements
+            "status": data.get("status", ""),
+            "step": data.get("step", ""),
+        }
+
+        return make_response(
+            status="success",
+            message=EPICS_FETCHED_SUCCESS,
+            data=response_data,
+            status_code=200
+        )
+
+    except Exception as e:
+        print(f"Error fetching epics: {e}")
+        return make_response(
+            status="error",
+            message=INTERNAL_SERVER_ERROR,
             status_code=500
         )
 
@@ -3166,8 +3265,7 @@ def fetch_epics(proposal_id, stakeholder, user_id):
                         "epic_id": epic.get("epic_id"),
                         "title": epic.get("title"),
                         "description": epic.get("description"),
-                        "id": epic.get("id"),
-                        "user_stories": epic.get("user_stories")
+                        "id": epic.get("id")
                     }
                     filtered_epics.append(filtered_epic)
 
@@ -3195,55 +3293,6 @@ def fetch_epics(proposal_id, stakeholder, user_id):
             data=None,
             status_code=500
         )
-    
-def fetch_epics_by_proposal(proposal_id, user_id):
-    """
-    Service to fetch all epics for a given proposal based on the proposal ID and user ID.
-
-    Parameters:
-        proposal_id (str): The ID of the proposal.
-        user_id (ObjectId): The ID of the user.
-
-    Returns:
-        (dict): A JSON response with epics, stakeholder, status, step, and a flag epicsIsPresent.
-    """
-    try:
-        # Fetch the proposal from the database by proposal_id and user_id
-        data = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
-
-        # Check if the proposal exists
-        if not data:
-            return make_response(
-                status="error",
-                message=PROPOSAL_NOT_FOUND,
-                status_code=404
-            )
-
-        # Get epics from the data and check if it's present
-        epics = data.get("epics", [])
-
-        # Prepare the response data
-        response_data = {
-            "epicsIsPresent": len(epics) > 0,  # True if epics list has elements
-            "status": data.get("status", ""),
-            "step": data.get("step", ""),
-        }
-
-        return make_response(
-            status="success",
-            message=EPICS_FETCHED_SUCCESS,
-            data=response_data,
-            status_code=200
-        )
-
-    except Exception as e:
-        print(f"Error fetching epics: {e}")
-        return make_response(
-            status="error",
-            message=INTERNAL_SERVER_ERROR,
-            status_code=500
-        )
-
 
 def delete_proposal(proposal_id, user_id):
     """

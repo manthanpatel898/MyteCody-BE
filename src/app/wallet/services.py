@@ -1,7 +1,7 @@
 import os
 from bson import ObjectId
-from flask import make_response
 import stripe
+from src.app.healper.response import make_response
 from src.app.utils.messages import MISSING_PARAMETERS, PAYMENT_INTENT_CREATED, PAYMENT_METHOD_ATTACHED_SUCCESS, PAYMENT_METHODS_FETCHED_SUCCESS, UNEXPECTED_ERROR, USER_NOT_FOUND, WALLET_INFO_FETCHED_SUCCESS, WALLET_NOT_FOUND
 from src.db import db
 
@@ -24,6 +24,7 @@ def get_wallet_info_service(user_id):
             # Convert ObjectId to string for JSON serialization
             wallet["_id"] = str(wallet["_id"])
             wallet["user_id"] = str(wallet["user_id"])
+            print('wallet',wallet)
             return make_response(
                 status="success",
                 message=WALLET_INFO_FETCHED_SUCCESS,
