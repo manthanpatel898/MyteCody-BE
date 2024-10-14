@@ -3,14 +3,8 @@ import stripe
 import os
 import datetime
 from bson import ObjectId
-from pymongo import MongoClient
-from marshmallow import ValidationError
-from src.app.user.services import UserNotFoundError
 from src.app.utils.constants import DEFAULT_TOKENS_AT_SUBSCRIPTION
-from src.app.utils.messages import CUSTOMER_SESSION, USER_NOT_FOUND, WEBHOOK_RECEIVED
 from src.db import db
-from src.app.subscription.schema import OrderSchema, SubscriptionSchema
-from pymongo.errors import PyMongoError
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 DEFAULT_TOKENS_AT_SUBSCRIPTION = 10000  # Define default tokens for new subscriptions
@@ -220,7 +214,7 @@ def stripe_webhook_wallet(data):
     #         })    
     return jsonify(
         {
-            "message": WEBHOOK_RECEIVED,
+            "message": 'WEBHOOK_RECEIVED',
             "data": "test",
         }
     )
