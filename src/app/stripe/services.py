@@ -7,7 +7,6 @@ from src.app.utils.constants import DEFAULT_TOKENS_AT_SUBSCRIPTION
 from src.db import db
 
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
-DEFAULT_TOKENS_AT_SUBSCRIPTION = 10000  # Define default tokens for new subscriptions
 
 def stripe_webhook(data):
     """

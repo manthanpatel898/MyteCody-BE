@@ -3267,7 +3267,7 @@ def fetch_epics(proposal_id, stakeholder, user_id):
                         "description": epic.get("description"),
                         "id": epic.get("id")
                     }
-                    filtered_epics.append(filtered_epic)
+                    filtered_epics.append(epic)
 
                 # Return a success response with the filtered epics
                 return make_response(
