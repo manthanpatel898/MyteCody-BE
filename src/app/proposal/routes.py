@@ -244,21 +244,22 @@ def update_epic(payload):
     user = current_user  # Fetch current user from JWT
     return update_existing_epic(payload=payload, user_id=user["_id"])
 
-@proposals.route("/deleteEpic", methods=["DELETE"])
+@proposals.route("/deleteEpic/<string:proposal_id>/<string:stakeholder>/<string:epic_id>", methods=["DELETE"])
 @jwt_required()
-@proposals.arguments(DeleteEpicSchema, location="json")
-def delete_epic(payload):
+def delete_epic(proposal_id, stakeholder, epic_id):
     """
     API to delete an epic from a specific stakeholder's list.
 
     Parameters:
-        payload (dict): JSON containing proposal_id, stakeholder, and epic_id.
+        proposal_id (str): The ID of the proposal.
+        stakeholder (str): The name of the stakeholder whose epic is to be deleted.
+        epic_id (str): The ID of the epic to be deleted.
 
     Returns:
         (dict): Response indicating the success or failure of the deletion operation.
     """
     user = current_user  # Fetch current user from JWT
-    return delete_epic_by_id(payload=payload, user_id=user["_id"])
+    return delete_epic_by_id(proposal_id, stakeholder, epic_id, user["_id"])
 
 @proposals.post("/generate/storie/<string:proposal_id>")
 @jwt_required()
@@ -368,20 +369,17 @@ def update_task(body):
     # Call the service to update the task
     return update_existing_task(payload=body, user_id=user["_id"])
 
-@proposals.route("/delete/story", methods=["DELETE"])
-@proposals.arguments(DeleteStorySchema, location="json")
+@proposals.route("/delete/story/<string:proposal_id>/<string:stakeholder>/<string:epic_id>/<string:story_id>", methods=["DELETE"])
 @jwt_required()
-def delete_story(body):
+def delete_story(proposal_id, stakeholder, epic_id, story_id):
     """
     API Endpoint to delete an existing story from a specific epic.
 
-    Expected Payload:
-    {
-        "proposal_id": "proposal_id",
-        "stakeholder": "stakeholder_name",
-        "epic_id": "epic_id",
-        "story_id": "story_id"
-    }
+    Parameters:
+        proposal_id (str): The ID of the proposal.
+        stakeholder (str): The name of the stakeholder.
+        epic_id (str): The ID of the epic.
+        story_id (str): The ID of the story to be deleted.
 
     Returns:
         (dict): Success message or error message if the story is not found.
@@ -389,31 +387,28 @@ def delete_story(body):
     user = current_user
 
     # Call the service to delete the story
-    return delete_existing_story(payload=body, user_id=user["_id"])
+    return delete_existing_story(proposal_id, stakeholder, epic_id, story_id, user["_id"])
 
-@proposals.route("/delete/task", methods=["DELETE"])
-@proposals.arguments(DeleteTaskSchema, location="json")
+@proposals.route("/delete/task/<string:proposal_id>/<string:stakeholder>/<string:epic_id>/<string:story_id>/<string:task_id>", methods=["DELETE"])
 @jwt_required()
-def delete_task(body):
+def delete_task(proposal_id, stakeholder, epic_id, story_id, task_id):
     """
     API Endpoint to delete an existing task from a specific story.
 
-    Expected Payload:
-    {
-        "proposal_id": "proposal_id",
-        "stakeholder": "stakeholder_name",
-        "epic_id": "epic_id",
-        "story_id": "story_id",
-        "task_id": "task_id"
-    }
+    Parameters:
+        proposal_id (str): The ID of the proposal.
+        stakeholder (str): The name of the stakeholder.
+        epic_id (str): The ID of the epic.
+        story_id (str): The ID of the story.
+        task_id (str): The ID of the task to be deleted.
 
     Returns:
         (dict): Success message or error message if the task is not found.
     """
-    user = current_user
+    user = current_user  # Fetch current authenticated user
 
     # Call the service to delete the task
-    return delete_existing_task(payload=body, user_id=user["_id"])
+    return delete_existing_task(proposal_id, stakeholder, epic_id, story_id, task_id, user["_id"])
 
 @proposals.route("/stories/<string:proposal_id>/<string:stakeholder>/<string:epic_id>", methods=["GET"])
 @jwt_required()

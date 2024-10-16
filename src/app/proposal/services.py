@@ -1798,20 +1798,22 @@ def update_existing_epic(payload, user_id):
             status_code=500
         )
 
-def delete_epic_by_id(payload, user_id):
+def delete_epic_by_id(proposal_id, stakeholder, epic_id, user_id):
     """
     Service to delete an epic for a specific stakeholder in a proposal.
 
     Parameters:
-        payload (dict): Contains proposal_id, stakeholder, and epic_id.
+        proposal_id (str): The ID of the proposal.
+        stakeholder (str): The name of the stakeholder whose epic is to be deleted.
+        epic_id (str): The ID of the epic to be deleted.
         user_id (str): The ID of the user making the request.
 
     Returns:
         (dict): A response with a success message, or an error message if not found.
     """
     try:
-        # Fetch the proposal from the database by proposal_id and user_id
-        proposal = db.proposals.find_one({"_id": ObjectId(payload["proposal_id"]), "user": ObjectId(user_id)})
+        # Fetch the proposal from the database
+        proposal = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
 
         # Check if the proposal exists
         if not proposal:
@@ -1822,56 +1824,53 @@ def delete_epic_by_id(payload, user_id):
                 status_code=404
             )
 
-        # Find the stakeholder's epics list in the proposal
-        for stakeholder_data in proposal["epics"]:
-            if stakeholder_data["stakeholder"] == payload["stakeholder"]:
-                epics_list = stakeholder_data["data"]
+        # Find the stakeholder's epics list
+        stakeholder_data = next(
+            (s for s in proposal["epics"] if s["stakeholder"] == stakeholder), None
+        )
 
-                # Find the index of the epic to delete by id
-                epic_to_delete = None
-                for epic in epics_list:
-                    if epic["id"] == payload["id"]:
-                        epic_to_delete = epic
-                        break
+        if not stakeholder_data:
+            return make_response(
+                status="error",
+                message=STAKEHOLDER_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
 
-                # If the epic is found, remove it from the list
-                if epic_to_delete:
-                    epics_list.remove(epic_to_delete)
+        # Find the epic to delete by epic_id
+        epic_to_delete = next(
+            (epic for epic in stakeholder_data["data"] if epic["id"] == epic_id), None
+        )
 
-                    # Update the proposal in the database with the updated epic list
-                    db.proposals.find_one_and_update(
-                        {"_id": ObjectId(payload["proposal_id"]), "user": ObjectId(user_id)},
-                        {
-                            "$set": {
-                                "epics.$[stakeholder].data": epics_list,
-                                "updated_at": datetime.datetime.utcnow()
-                            }
-                        },
-                        array_filters=[{"stakeholder.stakeholder": payload["stakeholder"]}]
-                    )
+        if not epic_to_delete:
+            return make_response(
+                status="error",
+                message=EPIC_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
 
-                    # Return a success response indicating the epic was deleted
-                    return make_response(
-                        status="success",
-                        message=EPIC_DELETED_SUCCESS,
-                        data=None,
-                        status_code=200
-                    )
+        # Remove the epic from the list
+        stakeholder_data["data"].remove(epic_to_delete)
 
-                # If the id is not found, return an error message
-                return make_response(
-                    status="error",
-                    message=EPIC_NOT_FOUND,
-                    data=None,
-                    status_code=404
-                )
+        # Update the proposal in the database
+        db.proposals.find_one_and_update(
+            {"_id": ObjectId(proposal_id), "user": ObjectId(user_id)},
+            {
+                "$set": {
+                    "epics.$[stakeholder].data": stakeholder_data["data"],
+                    "updated_at": datetime.datetime.utcnow()
+                }
+            },
+            array_filters=[{"stakeholder.stakeholder": stakeholder}]
+        )
 
-        # If the stakeholder is not found, return an error message
+        # Return success response
         return make_response(
-            status="error",
-            message=STAKEHOLDER_NOT_FOUND,
+            status="success",
+            message=EPIC_DELETED_SUCCESS,
             data=None,
-            status_code=404
+            status_code=200
         )
 
     except Exception as e:
@@ -1881,7 +1880,7 @@ def delete_epic_by_id(payload, user_id):
             message=INTERNAL_SERVER_ERROR,
             data=None,
             status_code=500
-        )
+        )    
     
 def generate_story_basedon_epics(proposal_id, user_id, user_email):
     """
@@ -2938,12 +2937,15 @@ def update_existing_task(payload, user_id):
             status_code=500
         )
 
-def delete_existing_story(payload, user_id):
+def delete_existing_story(proposal_id, stakeholder, epic_id, story_id, user_id):
     """
     Service to delete an existing story from a specific epic within a stakeholder in a proposal.
 
     Parameters:
-        payload (dict): Contains proposal_id, stakeholder, epic_id, and story_id.
+        proposal_id (str): The ID of the proposal.
+        stakeholder (str): The name of the stakeholder whose epic contains the story.
+        epic_id (str): The ID of the epic containing the story.
+        story_id (str): The ID of the story to be deleted.
         user_id (str): The ID of the user making the request.
 
     Returns:
@@ -2951,7 +2953,7 @@ def delete_existing_story(payload, user_id):
     """
     try:
         # Fetch the proposal from the database by proposal_id and user_id
-        proposal = db.proposals.find_one({"_id": ObjectId(payload["proposal_id"]), "user": ObjectId(user_id)})
+        proposal = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
 
         # Check if the proposal exists
         if not proposal:
@@ -2963,49 +2965,65 @@ def delete_existing_story(payload, user_id):
             )
 
         # Find the stakeholder's epics list in the proposal
-        for stakeholder_data in proposal["epics"]:
-            if stakeholder_data["stakeholder"] == payload["stakeholder"]:
-                # Find the specific epic in the stakeholder's data
-                for epic in stakeholder_data["data"]:
-                    if epic["id"] == payload["epic_id"]:
-                        # Get the current list of stories
-                        stories_list = epic.get("user_stories", [])
+        stakeholder_data = next(
+            (s for s in proposal["epics"] if s["stakeholder"] == stakeholder), None
+        )
 
-                        # Find and remove the story by story_id
-                        story_to_delete = next((story for story in stories_list if story["id"] == payload["story_id"]), None)
+        if not stakeholder_data:
+            return make_response(
+                status="error",
+                message=STAKEHOLDER_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
 
-                        if story_to_delete:
-                            stories_list.remove(story_to_delete)
+        # Find the specific epic within the stakeholder's data
+        epic_data = next((epic for epic in stakeholder_data["data"] if epic["id"] == epic_id), None)
 
-                            # Update the epic in the proposal with the updated stories list
-                            db.proposals.find_one_and_update(
-                                {"_id": ObjectId(payload["proposal_id"]), "user": ObjectId(user_id)},
-                                {
-                                    "$set": {
-                                        "epics.$[stakeholder].data.$[epic].user_stories": stories_list,
-                                        "updated_at": datetime.datetime.utcnow()
-                                    }
-                                },
-                                array_filters=[
-                                    {"stakeholder.stakeholder": payload["stakeholder"]},
-                                    {"epic.id": payload["epic_id"]}
-                                ]
-                            )
+        if not epic_data:
+            return make_response(
+                status="error",
+                message=EPIC_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
 
-                            # Return a success response
-                            return make_response(
-                                status="success",
-                                message=STORY_DELETED_SUCCESS,
-                                data=None,
-                                status_code=200
-                            )
+        # Find the story to delete within the epic's stories list
+        stories_list = epic_data.get("user_stories", [])
+        story_to_delete = next((story for story in stories_list if story["id"] == story_id), None)
 
-        # If the story or epic is not found, return an error message
+        if not story_to_delete:
+            return make_response(
+                status="error",
+                message=STORY_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
+
+        # Remove the story from the list
+        stories_list.remove(story_to_delete)
+
+        # Update the epic in the proposal with the updated stories list
+        db.proposals.find_one_and_update(
+            {"_id": ObjectId(proposal_id), "user": ObjectId(user_id)},
+            {
+                "$set": {
+                    "epics.$[stakeholder].data.$[epic].user_stories": stories_list,
+                    "updated_at": datetime.datetime.utcnow()
+                }
+            },
+            array_filters=[
+                {"stakeholder.stakeholder": stakeholder},
+                {"epic.id": epic_id}
+            ]
+        )
+
+        # Return success response
         return make_response(
-            status="error",
-            message=STORY_NOT_FOUND,
+            status="success",
+            message=STORY_DELETED_SUCCESS,
             data=None,
-            status_code=404
+            status_code=200
         )
 
     except Exception as e:
@@ -3016,13 +3034,17 @@ def delete_existing_story(payload, user_id):
             data=None,
             status_code=500
         )
-
-def delete_existing_task(payload, user_id):
+    
+def delete_existing_task(proposal_id, stakeholder, epic_id, story_id, task_id, user_id):
     """
     Service to delete an existing task from a specific story within a stakeholder's epic.
 
     Parameters:
-        payload (dict): Contains proposal_id, stakeholder, epic_id, story_id, and task_id.
+        proposal_id (str): The ID of the proposal.
+        stakeholder (str): The name of the stakeholder whose epic contains the story.
+        epic_id (str): The ID of the epic containing the story.
+        story_id (str): The ID of the story containing the task.
+        task_id (str): The ID of the task to be deleted.
         user_id (str): The ID of the user making the request.
 
     Returns:
@@ -3030,7 +3052,7 @@ def delete_existing_task(payload, user_id):
     """
     try:
         # Fetch the proposal from the database by proposal_id and user_id
-        proposal = db.proposals.find_one({"_id": ObjectId(payload["proposal_id"]), "user": ObjectId(user_id)})
+        proposal = db.proposals.find_one({"_id": ObjectId(proposal_id), "user": ObjectId(user_id)})
 
         # Check if the proposal exists
         if not proposal:
@@ -3041,52 +3063,75 @@ def delete_existing_task(payload, user_id):
                 status_code=404
             )
 
-        # Find the stakeholder's epics list in the proposal
-        for stakeholder_data in proposal["epics"]:
-            if stakeholder_data["stakeholder"] == payload["stakeholder"]:
-                # Find the specific epic in the stakeholder's data
-                for epic in stakeholder_data["data"]:
-                    if epic["id"] == payload["epic_id"]:
-                        # Find the specific story in the epic's user_stories
-                        for story in epic.get("user_stories", []):
-                            if story["id"] == payload["story_id"]:
-                                # Find and remove the task by task_id
-                                task_to_delete = next((task for task in story.get("tasks", []) if task["id"] == payload["task_id"]), None)
+        # Find the stakeholder's data within the proposal
+        stakeholder_data = next((s for s in proposal["epics"] if s["stakeholder"] == stakeholder), None)
 
-                                if task_to_delete:
-                                    # Remove the task
-                                    story["tasks"].remove(task_to_delete)
+        if not stakeholder_data:
+            return make_response(
+                status="error",
+                message=STAKEHOLDER_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
 
-                                    # Update the proposal in the database
-                                    db.proposals.find_one_and_update(
-                                        {"_id": ObjectId(payload["proposal_id"]), "user": ObjectId(user_id)},
-                                        {
-                                            "$set": {
-                                                "epics.$[stakeholder].data.$[epic].user_stories.$[story].tasks": story["tasks"],
-                                                "updated_at": datetime.datetime.utcnow()
-                                            }
-                                        },
-                                        array_filters=[
-                                            {"stakeholder.stakeholder": payload["stakeholder"]},
-                                            {"epic.id": payload["epic_id"]},
-                                            {"story.id": payload["story_id"]}
-                                        ]
-                                    )
+        # Find the specific epic within the stakeholder's data
+        epic_data = next((epic for epic in stakeholder_data["data"] if epic["id"] == epic_id), None)
 
-                                    # Return a success response
-                                    return make_response(
-                                        status="success",
-                                        message=TASK_DELETED_SUCCESS,
-                                        data=None,
-                                        status_code=200
-                                    )
+        if not epic_data:
+            return make_response(
+                status="error",
+                message=EPIC_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
 
-        # If the task or story is not found, return an error message
+        # Find the specific story within the epic's stories list
+        story_data = next((story for story in epic_data.get("user_stories", []) if story["id"] == story_id), None)
+
+        if not story_data:
+            return make_response(
+                status="error",
+                message=STORY_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
+
+        # Find the task to delete within the story's task list
+        task_to_delete = next((task for task in story_data.get("tasks", []) if task["id"] == task_id), None)
+
+        if not task_to_delete:
+            return make_response(
+                status="error",
+                message=TASK_NOT_FOUND,
+                data=None,
+                status_code=404
+            )
+
+        # Remove the task from the list
+        story_data["tasks"].remove(task_to_delete)
+
+        # Update the proposal in the database
+        db.proposals.find_one_and_update(
+            {"_id": ObjectId(proposal_id), "user": ObjectId(user_id)},
+            {
+                "$set": {
+                    "epics.$[stakeholder].data.$[epic].user_stories.$[story].tasks": story_data["tasks"],
+                    "updated_at": datetime.datetime.utcnow()
+                }
+            },
+            array_filters=[
+                {"stakeholder.stakeholder": stakeholder},
+                {"epic.id": epic_id},
+                {"story.id": story_id}
+            ]
+        )
+
+        # Return a success response
         return make_response(
-            status="error",
-            message=TASK_NOT_FOUND,
+            status="success",
+            message=TASK_DELETED_SUCCESS,
             data=None,
-            status_code=404
+            status_code=200
         )
 
     except Exception as e:
@@ -3097,7 +3142,7 @@ def delete_existing_task(payload, user_id):
             data=None,
             status_code=500
         )
-
+    
 def fetch_stories_by_epic_and_stakeholder(proposal_id, stakeholder, epic_id, user_id):
     """
     Service to fetch all stories for a specific epic and stakeholder in a proposal,
