@@ -7,6 +7,8 @@ import smtplib
 from time import strptime
 import uuid
 import datetime
+
+from flask import redirect
 from src.app.auth.schema import ForgotPasswordSchema
 from src.app.healper.validators import validate_password
 from src.app.utils.messages import EMAIL_NOT_VERIFIED_MESSAGE, EMAIL_VERIFICATION_SUCCESS, INTERNAL_SERVER_ERROR_MESSAGE, INVALID_CREDENTIALS_MESSAGE, INVALID_OR_EXPIRED_TOKEN, INVALID_USER, MISSING_TOKEN_OR_PASSWORD, PASSWORD_REQUIREMENTS_MESSAGE, PASSWORD_RESET_EMAIL_SENT, PASSWORD_RESET_SUCCESS, RESET_EMAIL_TOO_RECENT, STRIPE_ERROR_MESSAGE, USER_ALREADY_EXISTS_MESSAGE, USER_CREATED_SUCCESS, USER_DOES_NOT_EXIST, USER_LOGIN_SUCCESS, USER_REGISTERED_SUCCESSFULLY_MESSAGE, VALIDATION_ERROR_MESSAGE
@@ -402,6 +404,15 @@ def reset_password(body):
         )
 
 def verify_user_email(signup_token):
+    """
+    Service to verify the user's email address based on the provided signup token.
+
+    Parameters:
+        signup_token (str): The signup token used to verify the user's email.
+
+    Returns:
+        (dict): A JSON response with success or failure message, or a redirect to the sign-in page.
+    """
     try:
         # Find the user with the matching signup_token
         user = db.users.find_one({"signup_token": signup_token})
@@ -423,14 +434,12 @@ def verify_user_email(signup_token):
             }
         )
         
-        # Redirect the user to the sign-in page
-        base_url = os.environ.get("FRONTEND_URL")
-        return make_response(
-            status="success",
-            message=EMAIL_VERIFICATION_SUCCESS,
-            data={"redirect_url": base_url + "/sign-in"},
-            status_code=200
-        )
+        # Redirect the user to the sign-in page after successful verification
+        base_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        sign_in_url = f"{base_url}"
+        
+        # Return a redirect response to the sign-in page
+        return redirect(sign_in_url)
 
     except Exception as e:
         # Handle any unexpected errors
@@ -440,7 +449,6 @@ def verify_user_email(signup_token):
             message=INTERNAL_SERVER_ERROR_MESSAGE,
             status_code=500
         )
-
 def user_sso_login(args):
     try:
         email = args["email"]
