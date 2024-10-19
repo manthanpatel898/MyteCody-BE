@@ -878,6 +878,7 @@ def generate_business_vertical(user_id, proposal_id):
             {
                 "$set": {
                     "business_vertical": data["data"],
+                    "step": 3,
                     "updated_at": updated_at  # Add updated_at timestamp
                 }
             }
@@ -1162,7 +1163,8 @@ def generate_stakeholders(proposal_id, user_id):
                     "stake_holders": stakeholders_data["data"],
                     "status": PROPOSAL_STATUS["in_progress"],
                     "last_step": STAKEHOLDER_GENERATION_SUCCESS,
-                    "updated_at": updated_at  # Set updated_at field
+                    "updated_at": updated_at,  # Set updated_at field
+                    "step": 4
                 }
             }
         )
@@ -1271,7 +1273,7 @@ def update_stakeholders(payload, user_id):
                 "$set": {
                     "stake_holders": payload["stake_holders"],
                     "last_step": STAKEHOLDER_GENERATION_SUCCESS,
-                    "step": 3,
+                    "step": 4,
                     "updated_at": updated_at  # Set updated_at field
                 }
             }
@@ -1508,7 +1510,7 @@ def generate_epics(proposal_id, user_id, user_email):
         # Update the proposal status to "in progress" for generating epics
         db.proposals.find_one_and_update(
             {"_id": ObjectId(proposal_id)},
-            {"$set": {"status": PROPOSAL_STATUS["in_progress"], "last_step": EPICS_GENERATION_STARTED}},
+            {"$set": {"status": PROPOSAL_STATUS["in_progress"],"step": 5, "last_step": EPICS_GENERATION_STARTED}},
         )
 
         # Start the process to generate epics synchronously
@@ -1587,7 +1589,8 @@ async def background_save_epics(proposal, conversation, proposal_id, user_email,
                     "epics": result,
                     "status": PROPOSAL_STATUS["in_progress"],
                     "last_step": EPICS_GENERATED,
-                    "updated_at": updated_at
+                    "updated_at": updated_at,
+                    "step": 5
                 }
             },
         )
@@ -1914,7 +1917,8 @@ def generate_story_basedon_epics(proposal_id, user_id, user_email):
                 "$set": {
                     "status": PROPOSAL_STATUS["in_progress"],
                     "last_step": GENERATING_STORIES,
-                    "updated_at": datetime.datetime.utcnow()
+                    "updated_at": datetime.datetime.utcnow(),
+                    "step": 5
                 }
             },
         )
@@ -2143,6 +2147,7 @@ def generate_tasks_basedon_stories(proposal_id, user_id, user_email):
                 "$set": {
                     "status": PROPOSAL_STATUS["in_progress"],
                     "last_step": GENERATING_TASKS,
+                    "step": 5
                 }
             },
         )
